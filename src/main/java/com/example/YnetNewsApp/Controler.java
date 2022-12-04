@@ -1,70 +1,69 @@
 package com.example.YnetNewsApp;
 
-import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.ModelAndView;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.net.URL;
 
+@RestController
+public class Controler {
 
-@Controller
-public class Controler{
-    String url = "http://www.ynet.co.il/Integration/StoryRss2.xml";
+    @RequestMapping("/")
+    public ModelAndView breakingNews(Model model){
 
-    @GetMapping("/")
-    public String index(Model model){
-        model.addAttribute("news", this.getNews());
-        return "index";
+        String URL = "http://www.ynet.co.il/Integration/StoryRss2.xml";
+        String xmltotable = XML_to_Table(URL);
+        model.addAttribute("content", xmltotable);
+        ModelAndView modelView = new ModelAndView();
+        modelView.setViewName("index");
+        return modelView;
     }
 
-    public ArrayList<ArrayList<String>> getNews() {
-        ArrayList<ArrayList<String>> allNews = new ArrayList<>();
+
+    public static String XML_to_Table(String URL) {
+        String html_string = "";
 
         try {
-            NodeList news = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(this.url).getElementsByTagName("item");
+            // Getting the xml from the URL
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(new URL(URL).openStream());
 
-            for (int i = 0; i < news.getLength(); i++) {
-                Node item = news.item(i);
-                NodeList children = item.getChildNodes();
+            // Normalize the data
+            doc.getDocumentElement().normalize();
 
-                ArrayList<String> newsItem = new ArrayList<>();
+            // Split by tag name - item
+            NodeList list = doc.getElementsByTagName("item");
 
+            int len= list.getLength();
+            for (int i=0; i< len; i++) {
+                Node item = list.item(i);
+                Element element = (Element) item;
+                html_string += "<div class=\"item\">" +
+                        "<div class=\"title\"><h2>"+ element.getElementsByTagName("title").item(0).getTextContent() +"</h2></div>" +
+                        "  <div class=\"description\">" + element.getElementsByTagName("description").item(0).getTextContent() + "</div>\n" +
+                        "<div class=\"link\">"+ element.getElementsByTagName("link").item(0).getTextContent() +"</div>\n" +
+                        "<div class=\"pubDate\">"+ element.getElementsByTagName("pubDate").item(0).getTextContent() +"</div>" +
+                        "</div>";
 
-                for (int j = 0; j < children.getLength(); j++) {
-                    Node child = children.item(j);
-                    switch (child.getNodeName()) {
-                        case "title":
-                        case "link":
-                            newsItem.add(child.getTextContent());
-                            break;
-                        case "description":
-                            String content = child.getTextContent();
-                            if (content.length() > 0) {
-                                newsItem.add(content.substring(content.indexOf("</div>") + 6));
-                                newsItem.add(content.substring(content.indexOf("src") + 5, content.indexOf("' alt")));
-                            } else {
-                                newsItem.add(" ");
-                            }
-                            break;
-
-                        case "pubDate":
-                            newsItem.add(child.getTextContent().substring(0, 25));
-                            break;
-                    }
-                }
-                allNews.add(newsItem);
             }
+
         }
-        catch (ParserConfigurationException | SAXException | IOException e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
+        return html_string;
 
-        return allNews;
     }
-}
 
+
+}
